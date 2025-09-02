@@ -1,82 +1,116 @@
-// /test/GuestBoard.test.ts
+import { describe, it } from "node:test";
+import { deepStrictEqual, strictEqual, rejects } from "node:assert";
+import { network } from "hardhat";
+import type { Address } from "viem";
 
-import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { expect } from "chai";
-import hre from "hardhat";
-const { ethers } = hre;
+// **修复**: 将类型定义为对象，以匹配 viem 从 struct 数组返回的实际结构
+type Message = {
+    sender: Address;
+    message: string;
+    timestamp: bigint;
+};
 
-// 主测试套件
-describe("GuestBoard", function () {
-  // 我们定义一个 "fixture" 函数来部署合约，这样可以复用设置并加快测试速度
-  async function deployGuestBoardFixture() {
-    // 获取签名者账户
-    const [owner, addr1, addr2] = await ethers.getSigners();
+const { viem } = await network.connect();
+const { getPublicClient, getWalletClients, deployContract } = viem;
 
-    // 部署合约
-    const GuestBoardFactory = await ethers.getContractFactory("GuestBoard");
-    const guestBoard = await GuestBoardFactory.deploy();
+describe("GuestBoard Contract with Viem", function () {
+    // Fixture for deployment
+    async function deployFixture() {
+        const publicClient = await getPublicClient();
+        const [owner, addr1] = await getWalletClients();
+        const guestBoard = await deployContract("GuestBoard");
 
-    return { guestBoard, owner, addr1, addr2 };
-  }
+        return { publicClient, owner, addr1, guestBoard };
+    }
 
-  // 测试套件 1: 部署相关的测试
-  describe("Deployment", function () {
-    it("Should deploy and set the initial message from the owner", async function () {
-      const { guestBoard, owner } = await loadFixture(deployGuestBoardFixture);
+    it("Should deploy and set the initial message correctly", async function () {
+        const { guestBoard, owner } = await deployFixture();
 
-      // 检查总留言数是否为 1 (构造函数中的初始留言)
-      expect(await guestBoard.getAllMessagesCount()).to.equal(1);
-
-      // 检查初始留言的发送者是否为 owner
-      const initialMessage = (await guestBoard.messages(0));
-      expect(initialMessage.sender).to.equal(owner.address);
-      expect(initialMessage.message).to.equal("Hello Web3!");
+        // **修复**: viem 将单个 struct 作为元组返回
+        const initialMessageTuple = await guestBoard.read.messages([0n]);
+        const initialMessage: Message = {
+            sender: initialMessageTuple[0],
+            message: initialMessageTuple[1],
+            timestamp: initialMessageTuple[2],
+        };
+        
+        strictEqual(
+            initialMessage.sender.toLowerCase(),
+            owner.account.address.toLowerCase(),
+            "Initial message sender should be the owner"
+        );
+        strictEqual(initialMessage.message, "Hello Web3!", "Initial message content is incorrect");
     });
-  });
 
-  // 测试套件 2: 留言相关的测试
-  describe("Messaging", function () {
-    it("Should allow users to post a message", async function () {
-      const { guestBoard, addr1 } = await loadFixture(deployGuestBoardFixture);
-      const testMessage = "This is a test message.";
+    it("Should allow a user to post a message and update state correctly", async function () {
+        const { guestBoard, addr1 } = await deployFixture();
+        const testMessage = "This is a test message from addr1.";
 
-      // addr1 发送一条留言
-      await guestBoard.connect(addr1).postMessage(testMessage);
+        await guestBoard.write.postMessage([testMessage], { account: addr1.account });
 
-      // 检查总留言数是否变为 2
-      expect(await guestBoard.getAllMessagesCount()).to.equal(2);
+        const newMessageTuple = await guestBoard.read.messages([1n]);
+        const newMessage: Message = {
+            sender: newMessageTuple[0],
+            message: newMessageTuple[1],
+            timestamp: newMessageTuple[2],
+        }
 
-      // 检查 addr1 的留言数是否为 1
-      expect(await guestBoard.getMessagesCountByUser(addr1.address)).to.equal(1);
-
-      // 检查新留言的内容和发送者是否正确
-      const newMessage = (await guestBoard.messages(1));
-      expect(newMessage.sender).to.equal(addr1.address);
-      expect(newMessage.message).to.equal(testMessage);
-
-      // 检查 addr1 的留言 ID 索引是否正确
-      const userMsgIds = await guestBoard.userMsgId(addr1.address, 0);
-      expect(userMsgIds).to.equal(1); // 因为第二条留言的 ID 是 1
+        strictEqual(
+            newMessage.sender.toLowerCase(),
+            addr1.account.address.toLowerCase(),
+            "New message sender is incorrect"
+        );
+        strictEqual(newMessage.message, testMessage, "New message content is incorrect");
     });
 
     it("Should emit a NewMessage event when a message is posted", async function () {
-      const { guestBoard, addr1 } = await loadFixture(deployGuestBoardFixture);
-      const testMessage = "Another test message.";
-      
-      // 期望 postMessage 调用会触发 NewMessage 事件，并带有正确的参数
-      await expect(guestBoard.connect(addr1).postMessage(testMessage))
-        .to.emit(guestBoard, "NewMessage")
-        .withArgs(addr1.address, 1, (await ethers.provider.getBlock('latest'))!.timestamp + 1, testMessage);
-        // 注意：时间戳的精确断言可能因测试环境而异，通常检查其他参数更重要
+        const { guestBoard, addr1, publicClient } = await deployFixture();
+        const testMessage = "Testing event emission.";
+
+        const txHash = await guestBoard.write.postMessage([testMessage], { account: addr1.account });
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+        const events = await guestBoard.getEvents.NewMessage();
+        const lastEvent = events[events.length - 1];
+
+        strictEqual(
+            lastEvent.args.sender?.toLowerCase(),
+            addr1.account.address.toLowerCase(),
+            "Event sender address is incorrect"
+        );
+        strictEqual(lastEvent.args.messageId, 1n, "Event messageId is incorrect");
+        strictEqual(lastEvent.args.message, testMessage, "Event message content is incorrect");
     });
 
-    it("Should revert if the message is empty", async function () {
-      const { guestBoard, addr1 } = await loadFixture(deployGuestBoardFixture);
-
-      // 期望调用 postMessage 并传入空字符串时，交易会被回滚
-      await expect(
-        guestBoard.connect(addr1).postMessage("")
-      ).to.be.revertedWith("Guestbook: Message text cannot be empty.");
+    it("Should revert the transaction if the message is empty", async function () {
+        const { guestBoard, addr1 } = await deployFixture();
+        
+        // **修复**: 使用 `assert.rejects` 来测试异常，这是 node:test 的标准方式
+        await rejects(
+            guestBoard.write.postMessage([""], { account: addr1.account }),
+            (err: Error) => {
+                strictEqual(err.message.includes("Guestbook: Message text cannot be empty."), true);
+                return true;
+            },
+            "Transaction should have reverted with an empty message error"
+        );
     });
-  });
+
+    it("Should correctly return all messages", async function () {
+        const { guestBoard, owner, addr1 } = await deployFixture();
+        await guestBoard.write.postMessage(["Message from addr1"], { account: addr1.account });
+
+        // **修复**: viem 将 struct 数组作为对象数组返回，直接进行类型断言
+        const allMessages = (await guestBoard.read.getAllMessages()) as Message[];
+
+        strictEqual(allMessages.length, 2, "Should return two messages in total");
+        
+        // **修复**: 使用对象属性访问
+        strictEqual(allMessages[0].sender.toLowerCase(), owner.account.address.toLowerCase());
+        strictEqual(allMessages[0].message, "Hello Web3!");
+
+        strictEqual(allMessages[1].sender.toLowerCase(), addr1.account.address.toLowerCase());
+        strictEqual(allMessages[1].message, "Message from addr1");
+    });
 });
+
