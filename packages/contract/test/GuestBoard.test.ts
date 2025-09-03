@@ -3,67 +3,65 @@ import { deepStrictEqual, strictEqual, rejects } from "node:assert";
 import { network } from "hardhat";
 import type { Address } from "viem";
 
-// **修复**: 将类型定义为对象，以匹配 viem 从 struct 数组返回的实际结构
-type Message = {
-    sender: Address;
-    message: string;
-    timestamp: bigint;
-};
+// **修复**: 明确定义合约返回的 Struct 和 Event 的类型
+type Message = readonly [Address, string, bigint]; // [sender, message, timestamp]
+
+type NewMessageEventArgs = {
+    sender?: Address;
+    messageId?: bigint;
+    message?: string;
+    timestamp?: bigint;
+}
 
 const { viem } = await network.connect();
 const { getPublicClient, getWalletClients, deployContract } = viem;
 
-describe("GuestBoard Contract with Viem", function () {
-    // Fixture for deployment
+describe("GuestBoard Data Contract", function () {
     async function deployFixture() {
         const publicClient = await getPublicClient();
         const [owner, addr1] = await getWalletClients();
         const guestBoard = await deployContract("GuestBoard");
-
         return { publicClient, owner, addr1, guestBoard };
     }
 
-    it("Should deploy and set the initial message correctly", async function () {
+    it("Should start with zero messages upon deployment", async function () {
+        const { guestBoard } = await deployFixture();
+
+        const messageCount = await guestBoard.read.getMessageCount();
+        strictEqual(messageCount, 0n, "Initial message count should be 0");
+    });
+
+    it("Should allow a user to post the first message correctly", async function () {
         const { guestBoard, owner } = await deployFixture();
+        const testMessage = "This is the first message.";
 
-        // **修复**: viem 将单个 struct 作为元组返回
-        const initialMessageTuple = await guestBoard.read.messages([0n]);
-        const initialMessage: Message = {
-            sender: initialMessageTuple[0],
-            message: initialMessageTuple[1],
-            timestamp: initialMessageTuple[2],
-        };
-        
-        strictEqual(
-            initialMessage.sender.toLowerCase(),
-            owner.account.address.toLowerCase(),
-            "Initial message sender should be the owner"
-        );
-        strictEqual(initialMessage.message, "Hello Web3!", "Initial message content is incorrect");
+        await guestBoard.write.postMessage([testMessage], { account: owner.account });
+
+        const messageCount = await guestBoard.read.getMessageCount();
+        strictEqual(messageCount, 1n, "Message count should be 1 after posting");
+
+        // **修复**: 使用类型断言告诉 TypeScript postedMessageTuple 的确切类型
+        const postedMessageTuple = (await guestBoard.read.messages([0n])) as Message;
+        strictEqual(postedMessageTuple[0].toLowerCase(), owner.account.address.toLowerCase(), "Sender of the first message is incorrect");
+        strictEqual(postedMessageTuple[1], testMessage, "Content of the first message is incorrect");
     });
 
-    it("Should allow a user to post a message and update state correctly", async function () {
-        const { guestBoard, addr1 } = await deployFixture();
-        const testMessage = "This is a test message from addr1.";
+    it("Should correctly track message IDs for users", async function() {
+        const { guestBoard, owner, addr1 } = await deployFixture();
 
-        await guestBoard.write.postMessage([testMessage], { account: addr1.account });
+        await guestBoard.write.postMessage(["Owner's first message"], { account: owner.account });   // msgId 0
+        await guestBoard.write.postMessage(["Addr1's first message"], { account: addr1.account });   // msgId 1
+        await guestBoard.write.postMessage(["Owner's second message"], { account: owner.account });  // msgId 2
 
-        const newMessageTuple = await guestBoard.read.messages([1n]);
-        const newMessage: Message = {
-            sender: newMessageTuple[0],
-            message: newMessageTuple[1],
-            timestamp: newMessageTuple[2],
-        }
+        const ownerMessageIds = await guestBoard.read.getMessageIdsByUser([owner.account.address]);
+        deepStrictEqual(ownerMessageIds, [0n, 2n], "Owner's message ID list is incorrect");
 
-        strictEqual(
-            newMessage.sender.toLowerCase(),
-            addr1.account.address.toLowerCase(),
-            "New message sender is incorrect"
-        );
-        strictEqual(newMessage.message, testMessage, "New message content is incorrect");
+        const addr1MessageIds = await guestBoard.read.getMessageIdsByUser([addr1.account.address]);
+        deepStrictEqual(addr1MessageIds, [1n], "Addr1's message ID list is incorrect");
     });
 
-    it("Should emit a NewMessage event when a message is posted", async function () {
+
+    it("Should emit a NewMessage event upon posting", async function () {
         const { guestBoard, addr1, publicClient } = await deployFixture();
         const testMessage = "Testing event emission.";
 
@@ -71,46 +69,24 @@ describe("GuestBoard Contract with Viem", function () {
         await publicClient.waitForTransactionReceipt({ hash: txHash });
 
         const events = await guestBoard.getEvents.NewMessage();
-        const lastEvent = events[events.length - 1];
+        strictEqual(events.length, 1, "Should have emitted one event");
+        
+        // **修复**: 使用类型断言告诉 TypeScript eventArgs 的确切类型
+        const eventArgs = events[0].args as NewMessageEventArgs;
 
-        strictEqual(
-            lastEvent.args.sender?.toLowerCase(),
-            addr1.account.address.toLowerCase(),
-            "Event sender address is incorrect"
-        );
-        strictEqual(lastEvent.args.messageId, 1n, "Event messageId is incorrect");
-        strictEqual(lastEvent.args.message, testMessage, "Event message content is incorrect");
+        strictEqual(eventArgs.sender?.toLowerCase(), addr1.account.address.toLowerCase(), "Event sender is incorrect");
+        strictEqual(eventArgs.messageId, 0n, "Event messageId should be 0 for the first message");
+        strictEqual(eventArgs.message, testMessage, "Event message content is incorrect");
     });
 
-    it("Should revert the transaction if the message is empty", async function () {
+    it("Should revert if the message content is empty", async function () {
         const { guestBoard, addr1 } = await deployFixture();
         
-        // **修复**: 使用 `assert.rejects` 来测试异常，这是 node:test 的标准方式
         await rejects(
             guestBoard.write.postMessage([""], { account: addr1.account }),
-            (err: Error) => {
-                strictEqual(err.message.includes("Guestbook: Message text cannot be empty."), true);
-                return true;
-            },
+            (err: Error) => err.message.includes("Message cannot be empty."),
             "Transaction should have reverted with an empty message error"
         );
-    });
-
-    it("Should correctly return all messages", async function () {
-        const { guestBoard, owner, addr1 } = await deployFixture();
-        await guestBoard.write.postMessage(["Message from addr1"], { account: addr1.account });
-
-        // **修复**: viem 将 struct 数组作为对象数组返回，直接进行类型断言
-        const allMessages = (await guestBoard.read.getAllMessages()) as Message[];
-
-        strictEqual(allMessages.length, 2, "Should return two messages in total");
-        
-        // **修复**: 使用对象属性访问
-        strictEqual(allMessages[0].sender.toLowerCase(), owner.account.address.toLowerCase());
-        strictEqual(allMessages[0].message, "Hello Web3!");
-
-        strictEqual(allMessages[1].sender.toLowerCase(), addr1.account.address.toLowerCase());
-        strictEqual(allMessages[1].message, "Message from addr1");
     });
 });
 

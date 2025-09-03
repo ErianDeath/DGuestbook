@@ -20,13 +20,6 @@ contract GuestBoard {
         string message
         );
     
-    constructor() {
-        string memory initMsg = "Hello Web3!";
-        uint256 initMsgId = messages.length;
-        messages.push(Message(msg.sender, initMsg, block.timestamp));
-        userMsgId[msg.sender].push(initMsgId);
-        emit NewMessage(msg.sender, initMsgId, block.timestamp, initMsg);
-    }
 
     function postMessage(string memory _msg)  public {
         require(bytes(_msg).length > 0, "Guestbook: Message text cannot be empty.");
@@ -40,7 +33,7 @@ contract GuestBoard {
         return messages;
     }
 
-    function getMessagesCount() public view returns(uint256) {
+    function getMessageCount() public view returns(uint256) {
         return messages.length;
     }
 

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import { strictEqual, rejects } from "node:assert";
 import { network } from "hardhat";
-import { parseEther } from "viem";
+import { parseEther, type Address } from "viem";
 
 const { viem } = await network.connect();
 const { getPublicClient, getWalletClients, deployContract } = viem;
@@ -29,7 +29,8 @@ describe("GuestBoardNFT Contract", function () {
     describe("Minting Logic", function () {
         it("Should allow minting a message with the correct fee", async function () {
             const { addr1, guestBoardNFT } = await deployFixture();
-            const mintFee = await guestBoardNFT.read.mintFee();
+            // **修复**: 为 'mintFee' 添加类型断言
+            const mintFee = (await guestBoardNFT.read.mintFee()) as bigint;
             const messageIdToMint = 1n; // addr1 的留言 ID
 
             await guestBoardNFT.write.mintFromMessage([messageIdToMint, "ipfs://..."], {
@@ -37,7 +38,8 @@ describe("GuestBoardNFT Contract", function () {
                 value: mintFee,
             });
 
-            const ownerOfToken0 = await guestBoardNFT.read.ownerOf([0n]);
+            // **修复**: 为 'ownerOf' 的返回值添加类型断言
+            const ownerOfToken0 = (await guestBoardNFT.read.ownerOf([0n])) as Address;
             strictEqual(
                 ownerOfToken0.toLowerCase(),
                 addr1.account.address.toLowerCase(),
@@ -61,7 +63,7 @@ describe("GuestBoardNFT Contract", function () {
 
         it("Should revert if a user tries to mint another user's message", async function () {
             const { addr1, guestBoardNFT } = await deployFixture();
-            const mintFee = await guestBoardNFT.read.mintFee();
+            const mintFee = (await guestBoardNFT.read.mintFee()) as bigint;
             const ownersMessageId = 0n; // owner 的留言 ID
 
             await rejects(
@@ -76,7 +78,7 @@ describe("GuestBoardNFT Contract", function () {
 
         it("Should revert if trying to mint the same message twice", async function () {
             const { addr1, guestBoardNFT } = await deployFixture();
-            const mintFee = await guestBoardNFT.read.mintFee();
+            const mintFee = (await guestBoardNFT.read.mintFee()) as bigint;
             const messageIdToMint = 1n;
     
             // 第一次成功铸造
@@ -101,7 +103,7 @@ describe("GuestBoardNFT Contract", function () {
     describe("Token URI", function() {
         it("Should generate correct tokenURI with message and image data", async function () {
             const { owner, guestBoardNFT } = await deployFixture();
-            const mintFee = await guestBoardNFT.read.mintFee();
+            const mintFee = (await guestBoardNFT.read.mintFee()) as bigint;
             const imageURI = "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
             const messageId = 0n;
     
@@ -110,7 +112,8 @@ describe("GuestBoardNFT Contract", function () {
                 value: mintFee,
             });
     
-            const tokenURI = await guestBoardNFT.read.tokenURI([0n]);
+            // **修复**: 为 'tokenURI' 的返回值添加类型断言
+            const tokenURI = (await guestBoardNFT.read.tokenURI([0n])) as string;
             
             const jsonPart = tokenURI.split(',')[1];
             const decodedJson = Buffer.from(jsonPart, 'base64').toString('utf-8');
@@ -130,7 +133,7 @@ describe("GuestBoardNFT Contract", function () {
 
             await guestBoardNFT.write.setMintFee([newFee], { account: owner.account });
 
-            const updatedFee = await guestBoardNFT.read.mintFee();
+            const updatedFee = (await guestBoardNFT.read.mintFee()) as bigint;
             strictEqual(updatedFee, newFee, "Mint fee should be updated");
         });
 
@@ -147,7 +150,7 @@ describe("GuestBoardNFT Contract", function () {
 
         it("Should allow the owner to withdraw funds", async function () {
             const { publicClient, owner, addr1, guestBoardNFT } = await deployFixture();
-            const mintFee = await guestBoardNFT.read.mintFee();
+            const mintFee = (await guestBoardNFT.read.mintFee()) as bigint;
 
             // addr1 铸造一个 NFT，为合约增加一些余额
             await guestBoardNFT.write.mintFromMessage([1n, "ipfs://..."], {
@@ -160,8 +163,8 @@ describe("GuestBoardNFT Contract", function () {
 
             strictEqual(contractBalanceBefore, mintFee, "Contract should have a balance equal to the mint fee");
 
-            // Owner 执行提款
-            const txHash = await guestBoardNFT.write.withdraw({ account: owner.account });
+            // **修复**: 为没有参数的 write 函数传入一个空数组 []
+            const txHash = await guestBoardNFT.write.withdraw([], { account: owner.account });
             const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
             const gasUsed = receipt.gasUsed * receipt.effectiveGasPrice;
 
@@ -175,8 +178,9 @@ describe("GuestBoardNFT Contract", function () {
         it("Should prevent non-owners from withdrawing funds", async function () {
             const { addr1, guestBoardNFT } = await deployFixture();
 
+            // **修复**: 为没有参数的 write 函数传入一个空数组 []
             await rejects(
-                guestBoardNFT.write.withdraw({ account: addr1.account }),
+                guestBoardNFT.write.withdraw([], { account: addr1.account }),
                 (err: Error) => err.message.includes("Ownable: caller is not the owner"),
                 "Only owner should be able to withdraw funds"
             );
