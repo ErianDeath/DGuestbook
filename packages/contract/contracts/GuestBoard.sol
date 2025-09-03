@@ -40,7 +40,7 @@ contract GuestBoard {
         return messages;
     }
 
-    function getAllMessagesCount() public view returns(uint256) {
+    function getMessagesCount() public view returns(uint256) {
         return messages.length;
     }
 
