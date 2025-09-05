@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-4f762362972ffaf51cbc3d72c21e7741c10bd231",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/GuestBoard.sol": "project/contracts/GuestBoard.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/GuestBoard.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract GuestBoard {\n\n    struct Message{\n        address sender;\n        string message;\n        uint256 timestamp;\n    }\n\n    Message[] public messages;\n\n    mapping(address => uint256[]) public userMsgId;\n\n    event NewMessage(\n        address indexed sender, \n        uint256 indexed messageId,\n        uint256 timestamp, \n        string message\n        );\n    \n\n    function postMessage(string memory _msg)  public {\n        require(bytes(_msg).length > 0, \"Guestbook: Message text cannot be empty.\");\n        uint256 _msgId = messages.length;\n        messages.push(Message(msg.sender, _msg, block.timestamp));\n        userMsgId[msg.sender].push(_msgId);\n        emit NewMessage(msg.sender, _msgId, block.timestamp, _msg);\n    }\n\n    function getAllMessages() public view returns(Message[] memory) {\n        return messages;\n    }\n\n    function getMessageCount() public view returns(uint256) {\n        return messages.length;\n    }\n\n    function getMessagesCountByUser(address _sender) public view returns(uint256) {\n        return userMsgId[_sender].length;\n    }\n\n    function getMessageIdsByUser(address _sender) public view returns (uint256[] memory) {\n        return userMsgId[_sender];\n    }\n}"
+      }
+    }
+  }
+}
