@@ -84,7 +84,7 @@ describe("GuestBoard Data Contract", function () {
         
         await rejects(
             guestBoard.write.postMessage([""], { account: addr1.account }),
-            (err: Error) => err.message.includes("Message cannot be empty."),
+            (err: Error) => err.message.includes("Message text cannot be empty."),
             "Transaction should have reverted with an empty message error"
         );
     });

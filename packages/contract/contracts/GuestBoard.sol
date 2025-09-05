@@ -40,4 +40,8 @@ contract GuestBoard {
     function getMessagesCountByUser(address _sender) public view returns(uint256) {
         return userMsgId[_sender].length;
     }
+
+    function getMessageIdsByUser(address _sender) public view returns (uint256[] memory) {
+        return userMsgId[_sender];
+    }
 }

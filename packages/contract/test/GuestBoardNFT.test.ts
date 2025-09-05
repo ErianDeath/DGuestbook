@@ -143,7 +143,7 @@ describe("GuestBoardNFT Contract", function () {
 
             await rejects(
                 guestBoardNFT.write.setMintFee([newFee], { account: addr1.account }),
-                (err: Error) => err.message.includes("Ownable: caller is not the owner"),
+                (err: Error) => err.message.includes("OwnableUnauthorizedAccount"),
                 "Only owner should be able to set mint fee"
             );
         });
@@ -181,7 +181,7 @@ describe("GuestBoardNFT Contract", function () {
             // **修复**: 为没有参数的 write 函数传入一个空数组 []
             await rejects(
                 guestBoardNFT.write.withdraw([], { account: addr1.account }),
-                (err: Error) => err.message.includes("Ownable: caller is not the owner"),
+                (err: Error) => err.message.includes("OwnableUnauthorizedAccount"),
                 "Only owner should be able to withdraw funds"
             );
         });
