@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, useReadContract, useWriteContract, useBalance } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useBalance, useConfig } from 'wagmi';
 import { GUESTBOARD_NFT_CONTRACT } from '@/contracts/config';
 import type { Address } from 'viem';
 import axios from 'axios';
@@ -14,9 +14,10 @@ interface MintNFTButtonProps {
   messageId: bigint;
   messageText: string;
   author: Address;
+  onMintSuccess: () => void;
 }
 
-export function MintNFTButton({ messageId, messageText, author }: MintNFTButtonProps) {
+export function MintNFTButton({ messageId, messageText, author, onMintSuccess }: MintNFTButtonProps) {
   const { address, isConnected, chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const [status, setStatus] = useState('');
@@ -101,6 +102,7 @@ export function MintNFTButton({ messageId, messageText, author }: MintNFTButtonP
       });
 
       setStatus('Minted successfully!');
+      onMintSuccess();
     } catch (err) {
       console.error(err);
       setStatus(`Error: ${(err as Error).message}`);
