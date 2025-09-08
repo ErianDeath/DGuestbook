@@ -34,7 +34,7 @@ contract GuestBoardNFT is ERC721, Ownable {
     event NFTMinted(
         uint256 indexed tokenId,
         uint256 indexed messageId,
-        address owner
+        address indexed owner
     );
 
     // **修复1**: Ownable constructor in v5.0 requires the initial owner address.
