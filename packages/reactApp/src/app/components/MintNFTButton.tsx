@@ -96,7 +96,7 @@ export function MintNFTButton({ messageId, messageText, author }: MintNFTButtonP
       await writeContractAsync({
         ...GUESTBOARD_NFT_CONTRACT,
         functionName: 'mintFromMessage',
-        args: [messageId, metadataUri],
+        args: [messageId, imageUri],
         value: mintFee, // 此处 mintFee 已被确认为 bigint
       });
 
@@ -108,6 +108,7 @@ export function MintNFTButton({ messageId, messageText, author }: MintNFTButtonP
   };
   
   const isLoading = isFeeLoading || isBalanceLoading || isMintedStatusLoading;
+  const uniqueInputId = `mint-file-input-${messageId}`; // 为每个按钮创建唯一的 ID
 
   if (isLoading) return <span>Loading mint status...</span>;
   if (address !== author) return null; // 只显示给留言作者
@@ -115,7 +116,21 @@ export function MintNFTButton({ messageId, messageText, author }: MintNFTButtonP
 
   return (
     <div>
+      {/* 变更: 使用 label 作为可见的按钮 */}
+      <label htmlFor={uniqueInputId} style={{
+        cursor: 'pointer',
+        padding: '8px 12px',
+        backgroundColor: '#007bff',
+        color: 'white',
+        borderRadius: '4px',
+        display: 'inline-block',
+      }}>
+        Mint NFT
+      </label>
+
+      {/* 变更: 隐藏原生的文件输入框，并通过 id 与 label 关联 */}
       <input 
+        id={uniqueInputId}
         type="file" 
         accept="image/*" 
         onChange={(e) => {
@@ -123,8 +138,9 @@ export function MintNFTButton({ messageId, messageText, author }: MintNFTButtonP
             handleMint(e.target.files[0]);
           }
         }} 
+        style={{ display: 'none' }} // 关键：隐藏 input 标签
       />
-      {status && <p>{status}</p>}
+      {status && <p style={{ marginTop: '10px' }}>{status}</p>}
     </div>
   );
 }

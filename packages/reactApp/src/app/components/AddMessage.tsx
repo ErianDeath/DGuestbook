@@ -18,7 +18,14 @@ const getRootErrorMessage = (error: Error | null): string => {
 
 export function AddMessage() {
   const [message, setMessage] = useState('');
-  const { writeContract, isPending, error } = useWriteContract();
+  const { writeContract, isPending, error } = useWriteContract({
+    mutation: {
+      onSuccess: () => {
+        // 当用户成功提交交易后，清空输入框
+        setMessage('');
+      },
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
