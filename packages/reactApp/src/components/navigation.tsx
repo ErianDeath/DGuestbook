@@ -6,28 +6,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sparkles, Wallet, Home, ImageIcon, ChevronDown, Copy, ExternalLink, LogOut } from "lucide-react"
+import { Sparkles, Home, ImageIcon, ChevronDown } from "lucide-react"
+import { ConnectButton } from '@rainbow-me/rainbowkit'; // 新增导入
 
-interface NavigationProps {
-  isConnected?: boolean
-  userAddress?: string
-  onConnect?: () => void
-  onDisconnect?: () => void
-}
-
-export function Navigation({ isConnected = false, userAddress = "", onConnect, onDisconnect }: NavigationProps) {
+export function Navigation() { // 移除 props
   const pathname = usePathname()
-
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
-  const copyAddress = () => {
-    navigator.clipboard.writeText(userAddress)
-  }
 
   const navItems = [
     { href: "/", label: "Message Board", icon: Home },
@@ -90,44 +75,7 @@ export function Navigation({ isConnected = false, userAddress = "", onConnect, o
 
           {/* Wallet Connection */}
           <div className="flex items-center gap-2">
-            {!isConnected ? (
-              <Button onClick={onConnect} className="gap-2">
-                <Wallet className="w-4 h-4" />
-                <span className="hidden sm:inline">Connect Wallet</span>
-                <span className="sm:hidden">Connect</span>
-              </Button>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary" className="gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="hidden sm:inline">{truncateAddress(userAddress)}</span>
-                    <span className="sm:hidden">Wallet</span>
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium">Connected Wallet</p>
-                    <p className="text-xs text-muted-foreground">{userAddress}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={copyAddress} className="gap-2">
-                    <Copy className="w-4 h-4" />
-                    Copy Address
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2">
-                    <ExternalLink className="w-4 h-4" />
-                    View on Explorer
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onDisconnect} className="gap-2 text-destructive">
-                    <LogOut className="w-4 h-4" />
-                    Disconnect
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <ConnectButton /> {/* 使用 RainbowKit 的 ConnectButton */}
           </div>
         </div>
       </div>
