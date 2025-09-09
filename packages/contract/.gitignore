@@ -9,8 +9,6 @@
 
 # Hardhat Build Artifacts
 /artifacts
-
-# Hardhat compilation (v2) support directory
 /cache
 
 # Typechain output
@@ -18,6 +16,9 @@
 
 # Hardhat coverage reports
 /coverage
+coverage.json
 
-# .env file with secrets
+# Environment variables
 .env
+.env.*
+!.env.example
