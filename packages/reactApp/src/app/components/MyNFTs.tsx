@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useAccount, usePublicClient } from 'wagmi';
 import { GUESTBOARD_NFT_CONTRACT } from '@/contracts/config';
 import { NftCard } from '@/app/components/NftCard';
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 export function MyNFTs() {
   const { address } = useAccount();
@@ -19,26 +21,21 @@ export function MyNFTs() {
       setIsLoading(true);
       setError('');
       try {
-        // **新增**: 获取当前最新区块号
         const latestBlock = await publicClient.getBlockNumber();
-
-        // **变更**: 计算一个在 10000 区块限制内的起始区块
-        // 如果合约部署在很久以前，这里可能找不到，但对于新部署的合约是有效的
         const fromBlock = latestBlock > BigInt(10000) ? latestBlock - BigInt(9999) : BigInt(0);
 
         const logs = await publicClient.getContractEvents({
           ...GUESTBOARD_NFT_CONTRACT,
           eventName: 'NFTMinted',
           args: { owner: address },
-          fromBlock: fromBlock, // **变更**: 使用计算出的起始区块
+          fromBlock: fromBlock,
           toBlock: 'latest',
         });
         
-        const ids = logs.map(log => log.args.tokenId!);
+        const ids = logs.map(log => log.args.tokenId!).reverse();
         setTokenIds(ids);
       } catch (e) {
         console.error(e);
-        // 将 RPC 错误信息显示给用户
         setError((e as Error).message);
       } finally {
         setIsLoading(false);
@@ -48,17 +45,45 @@ export function MyNFTs() {
     fetchEvents();
   }, [address, publicClient]);
 
-  if (!address) return <div>Please connect your wallet to see your NFTs.</div>;
-  if (isLoading) return <div>Loading your NFTs...</div>;
-  if (error) return <div style={{ color: 'red' }}>Error fetching NFTs: {error}</div>;
+  if (!address) {
+      return (
+          <Card>
+              <CardContent className="p-6 text-center">
+                  <p>Please connect your wallet to see your NFTs.</p>
+              </CardContent>
+          </Card>
+      );
+  }
+  
+  if (isLoading) {
+      return (
+          <div className="flex justify-center items-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="ml-4">Loading your NFTs...</p>
+          </div>
+      );
+  }
+
+  if (error) {
+      return (
+          <Card className="border-destructive">
+              <CardContent className="p-6 text-center text-destructive">
+                  <p>Error fetching NFTs: {error}</p>
+              </CardContent>
+          </Card>
+      );
+  }
 
   return (
     <section>
-        <h2>My NFTs</h2>
         {tokenIds.length === 0 ? (
-            <p>No NFTs minted in the last 10,000 blocks found.</p>
+            <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                    <p>No NFTs minted in the last 10,000 blocks found.</p>
+                </CardContent>
+            </Card>
         ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {tokenIds.map(id => <NftCard key={id.toString()} tokenId={id} />)}
             </div>
         )}
